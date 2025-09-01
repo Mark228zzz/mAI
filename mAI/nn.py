@@ -163,17 +163,16 @@ class Neuron:
 
     def __call__(self, x):
         act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
-        out = act.act_f()
+        out = self.act_f(act)
         return out
 
     def parameters(self):
         return self.w + [self.b]
 
 
-
 class Layer:
-    def __init__(self, nin, nout):
-        self.neurons = [Neuron(nin) for _ in range(nout)]
+    def __init__(self, nin, nout, activation_function: Callable):
+        self.neurons = [Neuron(nin, activation_function) for _ in range(nout)]
 
     def __call__(self, x):
         outs = [n(x) for n in self.neurons]
@@ -184,19 +183,19 @@ class Layer:
 
 
 class MLP:
-    def __init__(self, nin, nouts):
+    def __init__(self, nin, nouts, activation_function: Callable = ...):
         sz = [nin] + nouts
-        self.layers = [Layer(sz[i], sz[i+1]) for i in range(len(nouts))]
+        self.layers = [Layer(sz[i], sz[i+1], activation_function) for i in range(len(nouts))]
 
     def __call__(self, xs):
+        if isinstance(xs[0], (int, float, Value)):
+            xs = [xs]
         out = []
-
         for x in xs:
             for layer in self.layers:
                 x = layer(x)
             out.append(x)
-
-        return out
+        return out if len(out) > 1 else out[0]
 
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]

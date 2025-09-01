@@ -1,4 +1,4 @@
-from nn import Value
+from .nn import Value
 import math
 
 
@@ -44,6 +44,17 @@ class ActivationF:
         # Define backpropagation rule + apply chain rule (out.grad)
         def _backward():
             x.grad += (1 - t**2) * out.grad
+
+        out._backward = _backward
+
+        return out
+
+    @staticmethod
+    def relu(x):
+        out = Value(x.data if x.data > 0 else 0, (x,), 'relu')
+
+        def _backward():
+            x.grad += (out.data > 0) * out.grad
 
         out._backward = _backward
 
