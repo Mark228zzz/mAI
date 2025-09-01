@@ -1,4 +1,5 @@
 from .nn import Value
+import random
 import math
 
 
@@ -54,13 +55,46 @@ class LossF:
 
     @staticmethod
     def cross_entropy(outputs, targets):
-        #assert len(outputs) == len(targets), 'Targets length are not equal to outputs length'
+        # Case 1: single sample
+        if isinstance(outputs[0], Value):
+            probs = Functional.softmax(outputs)
+            losses = [-probs[t].log() for t in targets]
+            return sum(losses, Value(0.0)) / len(losses)
 
-        probs = Functional.softmax(outputs)
-        n = len(targets)
+        # Case 2: batch of samples
+        batch_losses = [LossF.cross_entropy(o, [t]) for o, t in zip(outputs, targets)]
+        return sum(batch_losses, Value(0.0)) / len(batch_losses)
 
-        losses = []
-        for target in targets:
-            losses.append(-probs[target].log())
 
-        return sum(losses, Value(0.0)) / n
+class DataLoader:
+    def __init__(self, data, target, batch_size=1, shuffle=True):
+        assert len(data) == len(target), "data and target must be the same length"
+
+        self.data = data
+        self.target = target
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.indices = list(range(len(data)))
+
+    def __iter__(self):
+        if self.shuffle:
+            random.shuffle(self.indices)
+        self.current = 0
+        return self
+
+    def __next__(self):
+        if self.current >= len(self.indices):
+            raise StopIteration
+
+        # Get batch indices
+        batch_idx = self.indices[self.current:self.current+self.batch_size]
+        self.current += self.batch_size
+
+        # Slice data + targets
+        batch_data = [self.data[i] for i in batch_idx]
+        batch_target = [self.target[i] for i in batch_idx]
+
+        return batch_data, batch_target
+
+    def __len__(self):
+        return (len(self.data) + self.batch_size - 1) // self.batch_size

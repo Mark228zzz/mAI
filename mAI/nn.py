@@ -27,7 +27,7 @@ class Value:
 
     # ----- Representation -----
     def __repr__(self):
-        return f'{self.label}(data={self.data})'
+        return f'{self.label}(data={self.data}, grad={self.grad})'
 
 
     # ----- Numerical Operations -----
@@ -206,14 +206,19 @@ class MLP:
         self.layers = [Layer(sz[i], sz[i+1], activation_function) for i in range(len(nouts))]
 
     def __call__(self, xs):
-        if isinstance(xs[0], (int, float, Value)):
+        is_batch = isinstance(xs[0], (list, tuple, Value))
+        if not is_batch:
             xs = [xs]
+
         out = []
         for x in xs:
             for layer in self.layers:
                 x = layer(x)
+            if isinstance(x, Value):
+                x = [x]
             out.append(x)
-        return out if len(out) > 1 else out[0]
+
+        return out if is_batch else out[0]
 
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
