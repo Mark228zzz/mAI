@@ -112,9 +112,19 @@ class Value:
 
 
     # ----- Activation Functions -----
+    def relu(self):
+        out = Value(self.data if self.data > 0 else 0, (self,), 'relu')
+
+        def _backward():
+            self.grad += (out.data > 0) * out.grad
+
+        out._backward = _backward
+
+        return out
+
     def tanh(self):
         x = self.data
-        # t = (math.exp(2 * x) - 1) / (math.exp(2 * x) + 1)
+        # t = (math.exp(2 * x) - 1) / (math.exp(2 * x) + 1) # ERROR OVER USE OF RECURSES
         t = math.tanh(x)
         out = Value(t, (self, ), 'tanh')
 

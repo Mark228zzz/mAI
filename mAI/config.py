@@ -4,14 +4,10 @@ import math
 
 class Functional:
     @staticmethod
-    def softmax(data):
-        if not isinstance(data, list):
-            data = [x.data for x in data]
-
-        e_sum = sum(math.exp(x) for x in data)
-        result = [math.exp(x) / e_sum for x in data]
-
-        return result
+    def softmax(values: list[Value]):
+        exps = [v.exp() for v in values]
+        e_sum = sum(exps, Value(0.0))
+        return [e / e_sum for e in exps]
 
     @staticmethod
     def one_hot(data):
@@ -34,31 +30,15 @@ class Functional:
 class ActivationF:
     @staticmethod
     def tanh(x: Value | float):
-        # Convert float and int into Value object
         x = x if isinstance(x, Value) else Value(x)
 
-        t = ((x*2).exp() - 1) / ((x*2).exp() + 1)
-
-        out = Value(t, (x, ), 'tanh')
-
-        # Define backpropagation rule + apply chain rule (out.grad)
-        def _backward():
-            x.grad += (1 - t**2) * out.grad
-
-        out._backward = _backward
-
-        return out
+        return x.tanh()
 
     @staticmethod
-    def relu(x):
-        out = Value(x.data if x.data > 0 else 0, (x,), 'relu')
+    def relu(x: Value | float):
+        x = x if isinstance(x, Value) else Value(x)
 
-        def _backward():
-            x.grad += (out.data > 0) * out.grad
-
-        out._backward = _backward
-
-        return out
+        return x.relu()
 
 
 class LossF:
