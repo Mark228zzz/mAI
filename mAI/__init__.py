@@ -3,4 +3,4 @@ __author__ = 'Mark Mazur'
 
 from .config import ActivationF, LossF, Functional
 from .optim import Optimizer
-from .nn import MLP
+from .nn import MLP, Value

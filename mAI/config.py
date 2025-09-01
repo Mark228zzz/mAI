@@ -46,17 +46,21 @@ class LossF:
     def mse(outputs, targets):
         assert len(outputs) == len(targets), 'Targets length are not equal to outputs length'
 
-        loss = sum((p - y)**2 for y, p in zip(targets, outputs))
+        n = len(outputs)
+
+        loss = sum((p - y)**2 for y, p in zip(targets, outputs)) / n
 
         return loss
 
     @staticmethod
     def cross_entropy(outputs, targets):
-        assert len(outputs) == len(targets), 'Targets length are not equal to outputs length'
+        #assert len(outputs) == len(targets), 'Targets length are not equal to outputs length'
 
-        outputs = Functional.softmax(outputs)
-        targets = Functional.one_hot(targets)
+        probs = Functional.softmax(outputs)
+        n = len(targets)
 
-        loss = -(sum(y * math.log(p.data) for y, p in zip(targets, outputs)) / len(targets))
+        losses = []
+        for target in targets:
+            losses.append(-probs[target].log())
 
-        return loss
+        return sum(losses, Value(0.0)) / n
