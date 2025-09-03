@@ -1,14 +1,21 @@
 from .nn import Value
 import random
+from typing import List
 import math
 
 
 class Functional:
     @staticmethod
-    def softmax(values: list[Value]):
-        exps = [v.exp() for v in values]
-        e_sum = sum(exps, Value(0.0))
-        return [e / e_sum for e in exps]
+    def softmax(values: List[Value]) -> List[Value]:
+        m = max(v.data for v in values)
+        shifted = [v - m for v in values]
+        exps = [v.exp() for v in shifted]
+
+        total = exps[0]
+        for e in exps[1:]:
+            total = total + e
+
+        return [e / total for e in exps]
 
     @staticmethod
     def one_hot(data):
@@ -30,13 +37,13 @@ class Functional:
 
 class ActivationF:
     @staticmethod
-    def tanh(x: Value | float):
+    def tanh(x: Value | float) -> Value:
         x = x if isinstance(x, Value) else Value(x)
 
         return x.tanh()
 
     @staticmethod
-    def relu(x: Value | float):
+    def relu(x: Value | float) -> Value:
         x = x if isinstance(x, Value) else Value(x)
 
         return x.relu()
@@ -44,26 +51,56 @@ class ActivationF:
 
 class LossF:
     @staticmethod
-    def mse(outputs, targets):
-        assert len(outputs) == len(targets), 'Targets length are not equal to outputs length'
+    def mse(
+        outputs: List[Value] | List[List[Value]],
+        targets: List[Value] | List[List[Value]]
+        ) -> Value | List[Value]:
 
-        n = len(outputs)
+        assert len(outputs) == len(targets), 'Outputs length has to match length of targets'
 
-        loss = sum((p - y)**2 for y, p in zip(targets, outputs)) / n
+        # Case 1: single sample (List[Value])
+        if isinstance(outputs[0], Value):
+            loss = sum((p - y)**2 for y, p in zip(targets, outputs)) / len(targets)
+            return loss
 
-        return loss
+        # Case 2: batch of samples (List[List[Value]])
+        batch_losses = [LossF.mse(o, [t]) for o, t in zip(outputs, targets)]
+        return sum(batch_losses, Value(0.0)) / len(batch_losses)
 
     @staticmethod
-    def cross_entropy(outputs, targets):
-        # Case 1: single sample
-        if isinstance(outputs[0], Value):
-            probs = Functional.softmax(outputs)
-            losses = [-probs[t].log() for t in targets]
-            return sum(losses, Value(0.0)) / len(losses)
+    def cross_entropy(
+        logits: List[Value] | List[List[Value]],
+        targets: List[Value] | List[List[Value]]
+        ) -> Value | List[Value]:
+        """
+        logits: list of Value (length C) = unnormalized scores
+        target: int (class index) OR list of floats (one-hot / soft labels)
+        """
 
-        # Case 2: batch of samples
-        batch_losses = [LossF.cross_entropy(o, [t]) for o, t in zip(outputs, targets)]
-        return sum(batch_losses, Value(0.0)) / len(batch_losses)
+        # ----- Batch case -----
+        if isinstance(logits[0], list):
+            assert len(logits) == len(targets), "batch size mismatch"
+            losses = [LossF.cross_entropy(x, y) for x, y in zip(logits, targets)]
+            total = losses[0]
+            for l in losses[1:]:
+                total = total + l
+            return total / len(losses)
+
+        #  ----- Single sample case -----
+        probs = Functional.softmax(logits)
+
+        if isinstance(targets, (int, Value)):
+            # single class index
+            return -(probs[targets].log())
+
+        if isinstance(targets, list) and len(targets) == len(logits):
+            # one-hot or soft distribution
+            loss = (-probs[0].log()) * Value(float(targets[0]))
+            for p, t in zip(probs[1:], targets[1:]):
+                loss = loss + (-p.log()) * Value(float(t))
+            return loss
+
+        raise TypeError("target must be int (class index) or list of length C")
 
 
 class DataLoader:
