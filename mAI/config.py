@@ -73,18 +73,23 @@ class LossF:
         targets: List[Value] | List[List[Value]]
         ) -> Value | List[Value]:
         """
-        logits: list of Value (length C) = unnormalized scores
-        target: int (class index) OR list of floats (one-hot / soft labels)
+        logits:
+          - single: List[Value] of length C
+          - batch : List[List[Value]], each length C
+        targets:
+          - single: int (class index) OR list/tuple of floats (one-hot / soft)
+          - batch : List[int] or List[List[float]]
+        returns: mean loss over batch (scalar Value)
         """
 
-        # ----- Batch case -----
+        # ----- batch case -----
         if isinstance(logits[0], list):
+            assert isinstance(targets, (list, tuple)), "batch targets must be list/tuple"
             assert len(logits) == len(targets), "batch size mismatch"
-            losses = [LossF.cross_entropy(x, y) for x, y in zip(logits, targets)]
-            total = losses[0]
-            for l in losses[1:]:
-                total = total + l
-            return total / len(losses)
+            loss = LossF.cross_entropy(logits[0], targets[0])
+            for x, y in zip(logits[1:], targets[1:]):
+                loss = loss + LossF.cross_entropy(x, y)
+            return loss / len(logits)
 
         #  ----- Single sample case -----
         probs = Functional.softmax(logits)

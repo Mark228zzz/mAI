@@ -48,9 +48,6 @@ for epoch in range(num_epochs):
     for data, target in loader:
         output = model(data)
 
-        print(output)
-        print(target)
-
         loss = LossF.cross_entropy(output, target)
 
         optim.zero_grad()
