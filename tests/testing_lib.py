@@ -1,4 +1,9 @@
-from mAI import MLP, Value, ActivationF, LossF, DataLoader, Optimizer
+from ..core.value import Value
+from ..nn.loss import LossF
+from ..nn.functional import ActivationF
+from ..nn.optim import Optimizer
+from ..data.dataloader import DataLoader
+from ..nn.module import MLP
 import torch
 
 # =========================

@@ -1,52 +1,6 @@
-from .nn import Value
-import random
 from typing import List
-import math
-
-
-class Functional:
-    @staticmethod
-    def softmax(values: List[Value]) -> List[Value]:
-        m = max(v.data for v in values)
-        shifted = [v - m for v in values]
-        exps = [v.exp() for v in shifted]
-
-        total = exps[0]
-        for e in exps[1:]:
-            total = total + e
-
-        return [e / total for e in exps]
-
-    @staticmethod
-    def one_hot(data):
-        encodings = {}
-
-        n_unique = len(set(data))
-
-        for i, x in enumerate(set(data)):
-            encoding = [1 if i == iu else 0 for iu in range(n_unique)]
-            encodings[x] = encoding
-
-        one_hot_list = []
-
-        for x in data:
-            one_hot_list.append(encodings[x])
-
-        return one_hot_list
-
-
-class ActivationF:
-    @staticmethod
-    def tanh(x: Value | float) -> Value:
-        x = x if isinstance(x, Value) else Value(x)
-
-        return x.tanh()
-
-    @staticmethod
-    def relu(x: Value | float) -> Value:
-        x = x if isinstance(x, Value) else Value(x)
-
-        return x.relu()
+from ..core.value import Value
+from ..nn.functional import Functional
 
 
 class LossF:
@@ -106,37 +60,3 @@ class LossF:
             return loss
 
         raise TypeError("target must be int (class index) or list of length C")
-
-
-class DataLoader:
-    def __init__(self, data, target, batch_size=1, shuffle=True):
-        assert len(data) == len(target), "data and target must be the same length"
-
-        self.data = data
-        self.target = target
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.indices = list(range(len(data)))
-
-    def __iter__(self):
-        if self.shuffle:
-            random.shuffle(self.indices)
-        self.current = 0
-        return self
-
-    def __next__(self):
-        if self.current >= len(self.indices):
-            raise StopIteration
-
-        # Get batch indices
-        batch_idx = self.indices[self.current:self.current+self.batch_size]
-        self.current += self.batch_size
-
-        # Slice data + targets
-        batch_data = [self.data[i] for i in batch_idx]
-        batch_target = [self.target[i] for i in batch_idx]
-
-        return batch_data, batch_target
-
-    def __len__(self):
-        return (len(self.data) + self.batch_size - 1) // self.batch_size
