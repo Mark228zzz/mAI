@@ -1,11 +1,18 @@
-from typing import Literal
+from typing import Literal, List
+from ..core.value import Value
 
 
 class Optimizer:
-    def __init__(self, parameters, learning_rate: float, method: Literal['SGD'] = 'SGD'):
-        self.model_params = parameters
+    def __init__(
+            self,
+            parameters: List[Value],
+            learning_rate: float,
+            method: Literal['SGD'] = 'SGD'
+        ):
+
+        self.model_params = list(parameters)
         self.method = method.lower().strip()
-        self.a = learning_rate
+        self.a = float(learning_rate)
 
     def zero_grad(self):
         for p in self.model_params:

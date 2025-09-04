@@ -35,13 +35,10 @@ class Functional:
 
 class ActivationF:
     @staticmethod
-    def tanh(x: Value | float) -> Value:
-        x = x if isinstance(x, Value) else Value(x)
-
-        return x.tanh()
+    def identity(v: Value) -> Value: return v
 
     @staticmethod
-    def relu(x: Value | float) -> Value:
-        x = x if isinstance(x, Value) else Value(x)
+    def relu(v: Value) -> Value: return v.relu()
 
-        return x.relu()
+    @staticmethod
+    def tanh(v: Value) -> Value: return v.tanh()

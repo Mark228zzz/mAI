@@ -1,9 +1,16 @@
-from typing import Callable
+from typing import Callable, Iterable
 import random
 from ..core.value import Value
+from ..core.module import Module
+
+def _ensure_value_list(x: Iterable[float | int | Value]) -> list[Value]:
+    vals = []
+    for xi in x:
+        vals.append(xi if isinstance(xi, Value) else Value(xi))
+    return vals
 
 
-class Neuron:
+class Neuron(Module):
     '''
     Create a Neuron representation. A neuron why has N inputs therefore N weights,
     one bias term inside and an activation function. Works like perceptron
@@ -13,7 +20,7 @@ class Neuron:
         self.b = Value(random.uniform(-1, 1))
         self.act_f = act_f
 
-    def __call__(self, x):
+    def forward(self, x):
         act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
         out = self.act_f(act)
         return out
@@ -22,11 +29,11 @@ class Neuron:
         return self.w + [self.b]
 
 
-class Layer:
+class Layer(Module):
     def __init__(self, nin, nout, activation_function: Callable):
         self.neurons = [Neuron(nin, activation_function) for _ in range(nout)]
 
-    def __call__(self, x):
+    def forward(self, x):
         outs = [n(x) for n in self.neurons]
         return outs[0] if len(outs) == 1 else outs
 
@@ -34,12 +41,12 @@ class Layer:
         return [p for neuron in self.neurons for p in neuron.parameters()]
 
 
-class MLP:
+class MLP(Module):
     def __init__(self, nin, nouts, activation_function: Callable = ...):
         sz = [nin] + nouts
         self.layers = [Layer(sz[i], sz[i+1], activation_function) for i in range(len(nouts))]
 
-    def __call__(self, xs):
+    def forward(self, xs):
         is_batch = isinstance(xs[0], (list, tuple, Value))
         if not is_batch:
             xs = [xs]
