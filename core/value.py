@@ -1,11 +1,26 @@
 import math
 import random
 from typing import Tuple, Optional, Callable
+from contextlib import contextmanager
 
 
 # Base Value class defines as a core operational element represented
 # in mAI as scaler value using python variables. It is not efficient
 # but for an example of a machine learning library like PyTorch.
+_NO_GRAD = False
+
+
+@contextmanager
+def no_grad():
+    global _NO_GRAD
+    prev = _NO_GRAD
+    _NO_GRAD = True
+    try:
+        yield
+    finally:
+        _NO_GRAD = prev
+
+
 class Value:
     def __init__(
             self,
@@ -34,7 +49,9 @@ class Value:
     def __add__(self, other): # self + other
         other = other if isinstance(other, Value) else Value(other)
 
-        out = Value(self.data + other.data, (self, other), '+')
+        # If gradient tracking is disabled, do not create graph connections
+        children = () if _NO_GRAD else (self, other)
+        out = Value(self.data + other.data, children, '+')
 
         # Define backpropagation rule + apply chain rule (out.grad)
         def _backward():
@@ -51,7 +68,8 @@ class Value:
     def __mul__(self, other): # self * other
         other = other if isinstance(other, Value) else Value(other)
 
-        out = Value(self.data * other.data, (self, other), '*')
+        children = () if _NO_GRAD else (self, other)
+        out = Value(self.data * other.data, children, '*')
 
         def _backward():
             self.grad += other.data * out.grad
@@ -64,7 +82,8 @@ class Value:
     def __pow__(self, other):
         # Only support scalar exponents (int, float)
         assert isinstance(other, (int, float)), "__pow__ only supports scalar exponents"
-        out = Value(self.data ** other, (self,), f'**{other}')
+        children = () if _NO_GRAD else (self,)
+        out = Value(self.data ** other, children, f'**{other}')
 
         # Define backpropagation rule + apply chain rule (out.grad)
         def _backward():
@@ -77,7 +96,8 @@ class Value:
     def __rpow__(self, other):
     # handles (scalar ** Value)
         assert isinstance(other, (int, float)), "base must be a scalar"
-        out = Value(other ** self.data, (self,), f'{other}**')
+        children = () if _NO_GRAD else (self,)
+        out = Value(other ** self.data, children, f'{other}**')
 
         # Define backpropagation rule + apply chain rule (out.grad)
         def _backward():
@@ -100,7 +120,8 @@ class Value:
 
     def exp(self): # e**self
         x = self.data
-        out = Value(math.exp(x), (self, ), 'exp')
+        children = () if _NO_GRAD else (self,)
+        out = Value(math.exp(x), children, 'exp')
 
         # Define backpropagation rule + apply chain rule (out.grad)
         def _backward():
@@ -112,7 +133,8 @@ class Value:
 
     def log(self):
         x = self.data
-        out = Value(math.log(x), (self,), 'log')
+        children = () if _NO_GRAD else (self,)
+        out = Value(math.log(x), children, 'log')
 
         def _backward():
             self.grad += (1 / x) * out.grad
@@ -121,7 +143,8 @@ class Value:
 
     # ----- Activation Functions -----
     def relu(self):
-        out = Value(self.data if self.data > 0 else 0, (self,), 'relu')
+        children = () if _NO_GRAD else (self,)
+        out = Value(self.data if self.data > 0 else 0, children, 'relu')
 
         def _backward():
             self.grad += (1.0 if self.data > 0.0 else 0.0) * out.grad
@@ -134,7 +157,8 @@ class Value:
         x = self.data
         # t = (math.exp(2 * x) - 1) / (math.exp(2 * x) + 1) # ERROR OVER USE OF RECURSES
         t = math.tanh(x)
-        out = Value(t, (self, ), 'tanh')
+        children = () if _NO_GRAD else (self,)
+        out = Value(t, children, 'tanh')
 
         # Define backpropagation rule + apply chain rule (out.grad)
         def _backward():
@@ -152,6 +176,8 @@ class Value:
         in order to calculate all gradients right. Takes self as a root Value
         object where the backward pass begins and defines as 1.0.
         '''
+        if _NO_GRAD:
+            return
         topo = []
         visited = set()
 

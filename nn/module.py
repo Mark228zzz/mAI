@@ -1,6 +1,7 @@
 from typing import Callable, Iterable
 import random
 from ..core.value import Value
+from ..core.parameter import Parameter
 from ..core.module import Module
 
 def _ensure_value_list(x: Iterable[float | int | Value]) -> list[Value]:
@@ -13,11 +14,11 @@ def _ensure_value_list(x: Iterable[float | int | Value]) -> list[Value]:
 class Neuron(Module):
     '''
     Create a Neuron representation. A neuron why has N inputs therefore N weights,
-    one bias term inside and an activation function. Works like perceptron
+    one bias term inside and an activation function. Works like a simple perceptron.
     '''
     def __init__(self, nin, act_f: Callable = ...):
-        self.w = [Value(random.uniform(-1, 1)) for _ in range(nin)]
-        self.b = Value(random.uniform(-1, 1))
+        self.w = [Parameter(random.uniform(-1, 1)) for _ in range(nin)]
+        self.b = Parameter(random.uniform(-1, 1))
         self.act_f = act_f
 
     def forward(self, x):
