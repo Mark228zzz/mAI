@@ -4,12 +4,6 @@ from ..core.value import Value
 from ..core.parameter import Parameter
 from ..core.module import Module
 
-def _ensure_value_list(x: Iterable[float | int | Value]) -> list[Value]:
-    vals = []
-    for xi in x:
-        vals.append(xi if isinstance(xi, Value) else Value(xi))
-    return vals
-
 
 class Neuron(Module):
     '''

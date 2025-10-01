@@ -22,6 +22,8 @@ def no_grad():
 
 
 class Value:
+    __slots__ = ['data', 'grad', '_backward', '_op', '_prev', 'label']
+
     def __init__(
             self,
             data: float | int,
