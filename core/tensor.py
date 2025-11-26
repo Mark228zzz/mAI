@@ -11,13 +11,16 @@ class Tensor:
     def __init__(
         self,
         data: float | List[float],
+        require_grad: bool = False,
         _children: Optional[Tuple['Tensor', ...]] | None = (),
         _op: str | None = '',
         label: str = 'Tensor'
         ) -> None:
+
         self.data = np.array(data) # Create a numpy array as Tensor representation
         self.shape = self.data.shape # Get the shape from numpy .shape
-        self.grad = np.zeros(self.shape) # By default gradients are zeros
+        self.require_grad = require_grad # If False no gradients will be created and calculated
+        self.grad = np.zeros_like(self.data) if require_grad else None # By default gradients are ones (if require_grad is True)
         self._backward = lambda: None # The backward function to compute gradients
         self._prev = set(_children) # All other Tensors that lead to creation of this Tensor
         self._op = _op # The previous math operation that created this Tensor (None if it is an original Tensor)
@@ -36,13 +39,14 @@ class Tensor:
         out = Tensor(
             data=self.data + other.data,
             _children=(self, other),
-            _op='AddBackward'
+            _op='AddBackward',
+            require_grad=self.require_grad or other.require_grad
         )
 
         # Derivative of addition operation propagates to all parent Tensors that form out Tensor
         def _backward():
-            self.grad += 1.0 * out.grad
-            other.grad += 1.0 * out.grad
+            if self.grad is not None: self.grad += out.grad
+            if other.grad is not None: other.grad += out.grad
 
         out._backward = _backward
 
@@ -69,13 +73,14 @@ class Tensor:
         out = Tensor(
             data=self.data * other.data,
             _children=(self, other),
-            _op='MulBackward'
+            _op='MulBackward',
+            require_grad=self.require_grad or other.require_grad
         )
 
         # Derivative of muliplication
         def _backward():
-            self.grad += other.data * out.grad
-            other.grad += self.data * out.grad
+            if self.grad is not None: self.grad += other.data * out.grad
+            if other.grad is not None: other.grad += self.data * out.grad
 
         out._backward = _backward
 
@@ -92,12 +97,13 @@ class Tensor:
         out = Tensor(
             data=self.data @ other.data,
             _children=(self, other),
-            _op='MatMulBackward'
+            _op='MatMulBackward',
+            require_grad=self.require_grad or other.require_grad
         )
 
         def _backward():
-            self.grad += out.grad @ other.data.T
-            other.grad += self.data.T @ out.grad
+            if self.grad is not None: self.grad += out.grad @ other.data.T
+            if other.grad is not None: other.grad += self.data.T @ out.grad
 
         out._backward = _backward
 
@@ -118,7 +124,8 @@ class Tensor:
         out = Tensor(
             data=self.data ** other,
             _children=(self,),
-            _op='PowBackward'
+            _op='PowBackward',
+            require_grad=self.require_grad
         )
 
         # Derivative of exponent
@@ -136,7 +143,8 @@ class Tensor:
         out = Tensor(
             data=other ** self.data,
             _children=(self,),
-            _op='RevPowBackward'
+            _op='RevPowBackward',
+            require_grad=self.require_grad
         )
 
         def _backward():
@@ -158,7 +166,8 @@ class Tensor:
         out = Tensor(
             data=np.log(self.data),
             _children=(self,),
-            _op='LogBackward'
+            _op='LogBackward',
+            require_grad=self.require_grad
         )
 
         def _backward():
@@ -173,7 +182,8 @@ class Tensor:
         out = Tensor(
             data=np.exp(self.data),
             _children=(self,),
-            _op='ExpBackward'
+            _op='ExpBackward',
+            require_grad=self.require_grad
         )
 
         def _backward():
@@ -183,16 +193,13 @@ class Tensor:
 
         return out
 
-# ======== Representation of the object ========
-    def __repr__(self) -> str:
-        return f'{self.label}:\n{self.data}\nShape: {self.shape}'
-
 # ======== Activation Functions ========
     def relu(self):
         out = Tensor(
             data=np.maximum(self.data, 0),
             _children=(self,),
-            _op='ReLUBackward'
+            _op='ReLUBackward',
+            require_grad=self.require_grad
         )
 
         # Derivative of ReLU, when element more than 0 its gradient is 1 otherwise gradient is 0
@@ -207,12 +214,13 @@ class Tensor:
         out = Tensor(
             data=np.tanh(self.data),
             _children=(self,),
-            _op='TanhBackward'
+            _op='TanhBackward',
+            require_grad=self.require_grad
         )
 
         # Derivative of Tanh
         def _backward():
-            self.grad += (4 * ((self.exp(self.data) + self.exp(-self.data)) ** -2)) * out.grad
+            self.grad += (1 - out.data ** 2) * out.grad
 
         out._backward = _backward
 
@@ -220,14 +228,16 @@ class Tensor:
 
     def sigmoid(self):
         out = Tensor(
-            data=((1 + ((-self).exp())) ** 2).data,
+            data=((1 + ((-self).exp())) ** -1).data,
             _children=(self,),
-            _op='SigmoidBackward'
+            _op='SigmoidBackward',
+            require_grad=self.require_grad
         )
 
         # Derivative of Sigmoid
         def _backward():
-            self.grad += ( ((-self).exp()) * ((1 + (-self).exp()) ** -2) ) * out.grad
+            e_neg = (-self).exp()
+            self.grad += (e_neg.data * (1 + e_neg.data) ** -2) * out.grad
 
         out._backward = _backward
 
@@ -237,7 +247,8 @@ class Tensor:
         out = Tensor(
             data=np.maximum(self.data, alpha * self.data),
             _children=(self,),
-            _op='LeakyReLUBackward'
+            _op='LeakyReLUBackward',
+            require_grad=self.require_grad
         )
 
         def _backward():
@@ -249,5 +260,26 @@ class Tensor:
 
         return out
 
+# ======== Representation of the object ========
+    def __repr__(self) -> str:
+        repr = f'{self.label}:\n{self.data}\nShape: {self.shape}'
+        return repr if not self.require_grad else repr + f'\nRequire Grad: {self.require_grad}'
+
+# ======== Calculate gradients backwards ========
     def backward(self):
-        pass
+        topo = []
+        visited = set()
+
+        def build_topo(tensor):
+            if tensor not in visited:
+                visited.add(tensor)
+                for child in tensor._prev:
+                    build_topo(child)
+                topo.append(tensor)
+
+        build_topo(self)
+
+        # Set current Tensor's grads to ones, allowing backpropagation start
+        self.grad = np.ones_like(self.data)
+        for node in reversed(topo):
+            if node.require_grad and node.grad is not None: node._backward()
