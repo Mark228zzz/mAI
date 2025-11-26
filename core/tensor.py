@@ -54,7 +54,7 @@ class Tensor:
         return self + (-other)
 
     def __rsub__(self, other):
-        pass
+        return other + (-self)
 
     # MULTIPLICATION
     def __mul__(self, other):
@@ -106,7 +106,7 @@ class Tensor:
     def __truediv__(self, other):
         return self * other**-1
 
-    # EXPONENTIAL
+    # EXPONENTIAL (self^other)
     def __pow__(self, other):
         # Checks if other is scaler
         assert isinstance(other, (int, float)), '__pow__ works only with scalers'
@@ -125,7 +125,7 @@ class Tensor:
 
         return out
 
-    def __rpow__(self, other):
+    def __rpow__(self, other): # (other^self)
         # Checks if other is scaler
         assert isinstance(other, (int, float)), f'Base must to be a scaler'
 
@@ -146,24 +146,42 @@ class Tensor:
     def __neg__(self):
         return self.data * -1
 
+    # Logarithm (ln)
+    def log(self):
+        # Checks if Tensor has any elements that are less or equal to 0
+        assert np.all(self.data > 0), f'Tensor values must be more than 0 to compute Log, but got: {self.data}'
+
+        out = Tensor(
+            data=np.log(self.data),
+            _children=(self,),
+            _op='LogBackward'
+        )
+
+        def _backward():
+            self.grad += (1 / self.data) * out.grad
+
+        out._backward = _backward
+
+        return out
+
+    # e EXPONENTIAL (e^self)
+    def exp(self):
+        out = Tensor(
+            data=np.exp(self.data),
+            _children=(self,),
+            _op='ExpBackward'
+        )
+
+        def _backward():
+            self.grad += self.data * out.grad
+
+        out._backward = _backward
+
+        return out
+
 # ======== Representation of the object ========
     def __repr__(self) -> str:
         return f'{self.label}:\n{self.data}\nShape: {self.shape}'
 
-
-x = Tensor([[1., 2.],
-            [3., 4.]])
-
-y = Tensor([[1., 2.],
-            [3., 4.]])
-
-v = Tensor([[-1],
-            [-2]])
-
-print(x + y)
-print(x - y)
-print(x * y)
-print(x @ y)
-print(x @ v)
-print(x ** 3)
-print(2 ** v)
+    def backward(self):
+        pass
