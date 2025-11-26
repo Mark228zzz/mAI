@@ -28,7 +28,9 @@ class Tensor:
     def __add__(self, other):
         # Checks if other Tensor is numpy array or other data with the same shape
         other = other if isinstance(other, Tensor) else Tensor(other)
-        assert self.shape == other.shape, f'Shapes have to be equal, but got: {self.shape} and {other.shape}'
+
+        # Checks if other is not a scaler, if not shapes must be equal
+        if other.data.size != 1: assert self.shape == other.shape, f'Shapes have to be equal, but got: {self.shape} and {other.shape}'
 
         # Implement addition and return as new Tensor
         out = Tensor(
@@ -60,7 +62,9 @@ class Tensor:
     def __mul__(self, other):
         # Checks if other Tensor is numpy array or other data with the same shape
         other = other if isinstance(other, Tensor) else Tensor(other)
-        assert self.shape == other.shape, f'Shapes have to be equal, but got 2 tensors: {self.shape} and {other.shape}'
+
+        # Checks if other is not a scaler, if not shapes must be equal
+        if other.data.size != 1: assert self.shape == other.shape, f'Shapes have to be equal, but got 2 tensors: {self.shape} and {other.shape}'
 
         out = Tensor(
             data=self.data * other.data,
@@ -136,7 +140,7 @@ class Tensor:
         )
 
         def _backward():
-            self.grad += (out.data * math.log(other)) * out.grad
+            self.grad += (out.data * other.log()) * out.grad
 
         out._backward = _backward
 
@@ -144,7 +148,7 @@ class Tensor:
 
     # NEGATION
     def __neg__(self):
-        return self.data * -1
+        return self * -1
 
     # Logarithm (ln)
     def log(self):
@@ -182,6 +186,68 @@ class Tensor:
 # ======== Representation of the object ========
     def __repr__(self) -> str:
         return f'{self.label}:\n{self.data}\nShape: {self.shape}'
+
+# ======== Activation Functions ========
+    def relu(self):
+        out = Tensor(
+            data=np.maximum(self.data, 0),
+            _children=(self,),
+            _op='ReLUBackward'
+        )
+
+        # Derivative of ReLU, when element more than 0 its gradient is 1 otherwise gradient is 0
+        def _backward():
+            self.grad += (self.data > 0) * out.grad
+
+        out._backward = _backward
+
+        return out
+
+    def tanh(self):
+        out = Tensor(
+            data=np.tanh(self.data),
+            _children=(self,),
+            _op='TanhBackward'
+        )
+
+        # Derivative of Tanh
+        def _backward():
+            self.grad += (4 * ((self.exp(self.data) + self.exp(-self.data)) ** -2)) * out.grad
+
+        out._backward = _backward
+
+        return out
+
+    def sigmoid(self):
+        out = Tensor(
+            data=((1 + ((-self).exp())) ** 2).data,
+            _children=(self,),
+            _op='SigmoidBackward'
+        )
+
+        # Derivative of Sigmoid
+        def _backward():
+            self.grad += ( ((-self).exp()) * ((1 + (-self).exp()) ** -2) ) * out.grad
+
+        out._backward = _backward
+
+        return out
+
+    def leaky_relu(self, alpha: float = 0.01):
+        out = Tensor(
+            data=np.maximum(self.data, alpha * self.data),
+            _children=(self,),
+            _op='LeakyReLUBackward'
+        )
+
+        def _backward():
+            grad_input = np.ones_like(out.grad)
+            grad_input[self.data <= 0] = alpha
+            self.grad += grad_input * out.grad
+
+        out._backward = _backward
+
+        return out
 
     def backward(self):
         pass
