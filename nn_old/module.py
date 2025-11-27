@@ -1,7 +1,7 @@
 from typing import Callable, Iterable
 import random
-from ..core.value import Value
-from ..core.module import Module
+from ..core_old.value import Value
+from ..core_old.module import Module
 
 def _ensure_value_list(x: Iterable[float | int | Value]) -> list[Value]:
     vals = []

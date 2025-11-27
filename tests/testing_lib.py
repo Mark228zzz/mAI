@@ -1,9 +1,9 @@
-from ..core.value import Value
-from ..nn.loss import LossF
-from ..nn.functional import ActivationF
-from ..nn.optim import Optimizer
+from ..core_old.value import Value
+from ..nn_old.loss import LossF
+from ..nn_old.functional import ActivationF
+from ..nn_old.optim import Optimizer
 from ..data.dataloader import DataLoader
-from ..nn.module import MLP
+from ..nn_old.module import MLP
 import torch
 
 # =========================

@@ -18,7 +18,10 @@ class Tensor:
         label: str = 'Tensor'
         ) -> None:
 
-        self.data = np.array(data) # Create a numpy array as Tensor representation
+        if isinstance(data, Tensor):
+            data = data.data
+
+        self.data = np.array(data, dtype=float) # Create a numpy array as Tensor representation
         self.shape = self.data.shape # Get the shape from numpy .shape
         self.require_grad = require_grad # If False no gradients will be created and calculated
         self.grad = np.zeros_like(self.data) if require_grad else None # By default gradients are ones (if require_grad is True)
@@ -33,9 +36,6 @@ class Tensor:
         # Checks if other Tensor is numpy array or other data with the same shape
         other = other if isinstance(other, Tensor) else Tensor(other)
 
-        # Checks if other is not a scaler, if not shapes must be equal
-        if other.data.size != 1: assert self.shape == other.shape, f'Shapes have to be equal, but got: {self.shape} and {other.shape}'
-
         # Implement addition and return as new Tensor
         out = Tensor(
             data=self.data + other.data,
@@ -46,8 +46,25 @@ class Tensor:
 
         # Derivative of addition operation propagates to all parent Tensors that form out Tensor
         def _backward():
-            if self.grad is not None: self.grad += out.grad
-            if other.grad is not None: other.grad += out.grad
+            if self.grad is not None:
+                grad_self = out.grad
+                ndims_added = len(out.shape) - len(self.shape)
+                for i in range(ndims_added):
+                    grad_self = grad_self.sum(axis=0)
+                for i, (dim_self, dim_out) in enumerate(zip(self.shape, grad_self.shape)):
+                    if dim_self == 1 and dim_out > 1:
+                        grad_self = grad_self.sum(axis=i, keepdims=True)
+                self.grad += grad_self
+
+            if other.grad is not None:
+                grad_other = out.grad
+                ndims_added = len(out.shape) - len(other.shape)
+                for i in range(ndims_added):
+                    grad_other = grad_other.sum(axis=0)
+                for i, (dim_other, dim_out) in enumerate(zip(other.shape, grad_other.shape)):
+                    if dim_other == 1 and dim_out > 1:
+                        grad_other = grad_other.sum(axis=i, keepdims=True)
+                other.grad += grad_other
 
         out._backward = _backward
 
@@ -68,9 +85,6 @@ class Tensor:
         # Checks if other Tensor is numpy array or other data with the same shape
         other = other if isinstance(other, Tensor) else Tensor(other)
 
-        # Checks if other is not a scaler, if not shapes must be equal
-        if other.data.size != 1: assert self.shape == other.shape, f'Shapes have to be equal, but got 2 tensors: {self.shape} and {other.shape}'
-
         out = Tensor(
             data=self.data * other.data,
             _children=(self, other),
@@ -80,8 +94,25 @@ class Tensor:
 
         # Derivative of muliplication
         def _backward():
-            if self.grad is not None: self.grad += other.data * out.grad
-            if other.grad is not None: other.grad += self.data * out.grad
+            if self.grad is not None:
+                grad_self = other.data * out.grad
+                ndims_added = len(out.shape) - len(self.shape)
+                for i in range(ndims_added):
+                    grad_self = grad_self.sum(axis=0)
+                for i, (dim_self, dim_out) in enumerate(zip(self.shape, grad_self.shape)):
+                    if dim_self == 1 and dim_out > 1:
+                        grad_self = grad_self.sum(axis=i, keepdims=True)
+                self.grad += grad_self
+
+            if other.grad is not None:
+                grad_other = self.data * out.grad
+                ndims_added = len(out.shape) - len(other.shape)
+                for i in range(ndims_added):
+                    grad_other = grad_other.sum(axis=0)
+                for i, (dim_other, dim_out) in enumerate(zip(other.shape, grad_other.shape)):
+                    if dim_other == 1 and dim_out > 1:
+                        grad_other = grad_other.sum(axis=i, keepdims=True)
+                other.grad += grad_other
 
         out._backward = _backward
 
@@ -93,7 +124,6 @@ class Tensor:
     # MATRIX MULTIPLICATION
     def __matmul__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
-        assert self.shape[-1] == other.shape[0], f'Shapes have to be equal in N dim ((M, N) and (N, K)), got 2 tensors: {self.shape} and {other.shape}'
 
         out = Tensor(
             data=self.data @ other.data,
@@ -161,9 +191,6 @@ class Tensor:
 
     # Logarithm (ln)
     def log(self):
-        # Checks if Tensor has any elements that are less or equal to 0
-        assert np.all(self.data > 0), f'Tensor values must be more than 0 to compute Log, but got: {self.data}'
-
         out = Tensor(
             data=np.log(self.data),
             _children=(self,),
@@ -286,10 +313,94 @@ class Tensor:
         return repr if not self.require_grad else repr + f'\nRequire Grad: {self.require_grad}'
 
 # ======== NumPy functionality ========
-    def reshape(self, shape: Tuple[int, ...], order: Literal['C', 'A', 'F'] = 'C'):
+    def reshape(self, shape: Tuple[int, ...], order: Literal['C', 'A', 'F'] = 'C') -> None:
         self.data = self.data.reshape(shape, order=order)
         if self.grad is not None: self.grad = self.grad.reshape(shape, order=order)
 
-    def flatten(self, order: Literal['C', 'A', 'F', 'K'] = 'C'):
+    def flatten(self, order: Literal['C', 'A', 'F', 'K'] = 'C') -> None:
         self.data = self.data.flatten(order=order)
         if self.grad is not None: self.grad = self.grad.flatten(order=order)
+
+    def sum(self, axis: Tuple[int, ...] | None = None, keepdims: bool = False) -> 'Tensor':
+        out = Tensor(
+            data=self.data.sum(axis=axis, keepdims=keepdims),
+            _children=(self,),
+            _op='SumBackward',
+            require_grad=self.require_grad
+        )
+
+        def _backward():
+            # Gradient broadcasts back to original shape
+            if axis is None:
+                self.grad += np.ones_like(self.data) * out.grad
+            else:
+                # Expand dims to match original shape for broadcasting
+                grad_expanded = np.expand_dims(out.grad, axis=axis) if not keepdims else out.grad
+                self.grad += np.broadcast_to(grad_expanded, self.data.shape)
+
+        out._backward = _backward
+        return out
+
+    def mean(self, axis: Tuple[int, ...] | None = None, keepdims: bool = False) -> 'Tensor':
+        n = self.data.size if axis is None else np.prod([self.shape[i] for i in (axis if isinstance(axis, tuple) else (axis,))])
+
+        out = Tensor(
+            data=self.data.mean(axis=axis, keepdims=keepdims),
+            _children=(self,),
+            _op='MeanBackward',
+            require_grad=bool(self.require_grad)
+        )
+        def _backward():
+            # Mean distributes gradient equally: d(mean)/dx = 1/n
+            if axis is None:
+                self.grad += np.ones_like(self.data) * out.grad / n
+            else:
+                grad_expanded = np.expand_dims(out.grad, axis=axis) if not keepdims else out.grad
+                self.grad += np.broadcast_to(grad_expanded, self.data.shape) / n
+
+        out._backward = _backward
+        return out
+
+    def max(self, axis: Tuple[int, ...] | None = None, keepdims: bool = False) -> 'Tensor':
+        out = Tensor(
+            data=self.data.max(axis=axis, keepdims=keepdims),
+            _children=(self,),
+            _op='MaxBackward'
+        )
+
+        def _backward():
+            # Gradient flows only to the maximum value(s)
+            if axis is None:
+                mask = (self.data == out.data)
+            else:
+                # Expand dims to match original shape
+                max_expanded = np.expand_dims(out.data, axis=axis) if not keepdims else out.data
+                mask = (self.data == max_expanded)
+
+            # Distribute gradient to all max values (handles ties)
+            grad_expanded = np.expand_dims(out.grad, axis=axis) if (axis is not None and not keepdims) else out.grad
+            self.grad += mask * np.broadcast_to(grad_expanded, self.data.shape)
+
+        out._backward = _backward
+        return out
+
+    def min(self, axis: Tuple[int, ...] | None = None, keepdims: bool = False) -> 'Tensor':
+        out = Tensor(
+            data=self.data.min(axis=axis, keepdims=keepdims),
+            _children=(self,),
+            _op='MinBackward'
+        )
+
+        def _backward():
+            # Gradient flows only to the minimum value(s)
+            if axis is None:
+                mask = (self.data == out.data)
+            else:
+                min_expanded = np.expand_dims(out.data, axis=axis) if not keepdims else out.data
+                mask = (self.data == min_expanded)
+
+            grad_expanded = np.expand_dims(out.grad, axis=axis) if (axis is not None and not keepdims) else out.grad
+            self.grad += mask * np.broadcast_to(grad_expanded, self.data.shape)
+
+        out._backward = _backward
+        return out

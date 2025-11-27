@@ -1,6 +1,6 @@
 from typing import List
-from ..core.value import Value
-from ..nn.functional import Functional
+from ..core_old.value import Value
+from ..nn_old.functional import Functional
 
 
 class LossF:
