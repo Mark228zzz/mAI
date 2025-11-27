@@ -1,6 +1,5 @@
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Literal
 import numpy as np
-import math
 
 
 # Base Tensor class defines as a core operational element represented
@@ -8,6 +7,8 @@ import math
 # but recreation of a machine learning library like PyTorch or Tensorflow.
 # Made for educational purpose to corely understand how ML libs work under the hood.
 class Tensor:
+    __slots__ = ['data', 'shape', 'require_grad', '_backward', '_prev', '_op', 'label', 'grad']
+
     def __init__(
         self,
         data: float | List[float],
@@ -21,7 +22,7 @@ class Tensor:
         self.shape = self.data.shape # Get the shape from numpy .shape
         self.require_grad = require_grad # If False no gradients will be created and calculated
         self.grad = np.zeros_like(self.data) if require_grad else None # By default gradients are ones (if require_grad is True)
-        self._backward = lambda: None # The backward function to compute gradients
+        self._backward: callable = lambda: None # The backward function to compute gradients
         self._prev = set(_children) # All other Tensors that lead to creation of this Tensor
         self._op = _op # The previous math operation that created this Tensor (None if it is an original Tensor)
         self.label = label # The name of a Tensor (debug)
@@ -260,11 +261,6 @@ class Tensor:
 
         return out
 
-# ======== Representation of the object ========
-    def __repr__(self) -> str:
-        repr = f'{self.label}:\n{self.data}\nShape: {self.shape}'
-        return repr if not self.require_grad else repr + f'\nRequire Grad: {self.require_grad}'
-
 # ======== Calculate gradients backwards ========
     def backward(self):
         topo = []
@@ -283,3 +279,17 @@ class Tensor:
         self.grad = np.ones_like(self.data)
         for node in reversed(topo):
             if node.require_grad and node.grad is not None: node._backward()
+
+# ======== Representation of the object ========
+    def __repr__(self) -> str:
+        repr = f'{self.label}:\n{self.data}\nShape: {self.shape}'
+        return repr if not self.require_grad else repr + f'\nRequire Grad: {self.require_grad}'
+
+# ======== NumPy functionality ========
+    def reshape(self, shape: Tuple[int, ...], order: Literal['C', 'A', 'F'] = 'C'):
+        self.data = self.data.reshape(shape, order=order)
+        if self.grad is not None: self.grad = self.grad.reshape(shape, order=order)
+
+    def flatten(self, order: Literal['C', 'A', 'F', 'K'] = 'C'):
+        self.data = self.data.flatten(order=order)
+        if self.grad is not None: self.grad = self.grad.flatten(order=order)
