@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, List, Literal
+from typing import Tuple, Optional, List, Literal, Callable
 import numpy as np
 
 
@@ -404,3 +404,85 @@ class Tensor:
 
         out._backward = _backward
         return out
+
+# ======== Data initiation ========
+    @staticmethod
+    def randn(shape: Tuple[int, ...], require_grad: bool = False, mean: float | int = 0.0, stddev: float | int = 1.0, label: str = 'Tensor') -> 'Tensor':
+        """
+        Creates a Tensor with random values from a normal distribution (Gaussian).
+
+        Args:
+            shape: Desired output shape (e.g., (3, 4) for 3x4 matrix)
+            require_grad: If True, tracks gradients for backpropagation (default: False)
+            stddev: Standard deviation of the normal distribution (default: 1.0)
+            mean: Mean of the normal distribution (default: 0.0)
+            label: Debug label for the tensor (default: 'Tensor')
+
+        Returns:
+            Tensor with shape `shape` containing ~N(mean, stddev) random values.
+
+        Example:
+            >>> w = Tensor.randn((784, 10), stddev=0.02, mean=0.0)  # Weight init for 784->10 layer
+            >>> b = Tensor.randn((10,), require_grad=True)  # Biases with gradients
+        """
+
+        data = np.random.normal(mean, stddev, shape)
+
+        random_tensor = Tensor(
+            data=data,
+            require_grad=require_grad,
+            label=label
+        )
+
+        return random_tensor
+
+    @staticmethod
+    def zeros(shape: Tuple[int, ...], dtype = float, require_grad: bool = False, label: str = 'Tensor') -> 'Tensor':
+        data = np.zeros(shape=shape, dtype=dtype)
+
+        zero_tensor = Tensor(
+            data=data,
+            require_grad=require_grad,
+            label=label
+        )
+
+        return zero_tensor
+
+    @staticmethod
+    def ones(shape: Tuple[int, ...], require_grad: bool = False, dtype = float, label: str = 'Tensor') -> 'Tensor':
+        data = np.ones(shape=shape, dtype=dtype)
+
+        one_tensor = Tensor(
+            data=data,
+            require_grad=require_grad,
+            label=label
+        )
+
+        return one_tensor
+
+
+    @staticmethod
+    def init(shape: Tuple[int, ...], func: Callable, require_grad: bool = False, label: str = 'Tensor') -> 'Tensor':
+        """
+        Creates a Tensor using custom initialization function.
+
+        Args:
+            shape: Desired output shape
+            func: Callable that takes np.ndarray of given shape and returns initialized data
+            require_grad: If True, tracks gradients (default: False)
+            label: Debug label (default: 'Tensor')
+
+        Example:
+            >>> Tensor.init((3,4), lambda x: np.random.uniform(-1,1,x))  # Uniform [-1,1]
+            >>> Tensor.init((784,10), lambda x: np.random.normal(0, 0.01, x))  # Xavier-like
+        """
+
+        data = func(shape)
+
+        one_tensor = Tensor(
+            data=data,
+            require_grad=require_grad,
+            label=label
+        )
+
+        return one_tensor
