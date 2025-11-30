@@ -15,7 +15,7 @@ class Linear(Module):
         in_feautres: int,
         out_features: int,
         act_func: Callable | None = None,
-        init_method: Literal['randn', 'he', 'xavier'] = 'randn'
+        init_method: Literal['randn', 'he', 'xavier'] = 'he'
     ) -> None:
         self.in_f = in_feautres
         self.out_f = out_features
