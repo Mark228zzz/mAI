@@ -215,7 +215,7 @@ class Tensor:
         )
 
         def _backward():
-            self.grad += self.data * out.grad
+            self.grad += out.data * out.grad
 
         out._backward = _backward
 
@@ -365,7 +365,8 @@ class Tensor:
         out = Tensor(
             data=self.data.max(axis=axis, keepdims=keepdims),
             _children=(self,),
-            _op='MaxBackward'
+            _op='MaxBackward',
+            require_grad=self.require_grad
         )
 
         def _backward():
@@ -388,7 +389,8 @@ class Tensor:
         out = Tensor(
             data=self.data.min(axis=axis, keepdims=keepdims),
             _children=(self,),
-            _op='MinBackward'
+            _op='MinBackward',
+            require_grad=self.require_grad
         )
 
         def _backward():
@@ -403,6 +405,16 @@ class Tensor:
             self.grad += mask * np.broadcast_to(grad_expanded, self.data.shape)
 
         out._backward = _backward
+        return out
+
+    def T(self) -> 'Tensor':
+        out = Tensor(self.data.T, _children=(self,), _op='T', require_grad=self.require_grad)
+
+        def _backward():
+            self.grad += out.grad.T
+
+        out._backward = _backward
+
         return out
 
 # ======== Data initiation ========
@@ -486,3 +498,13 @@ class Tensor:
         )
 
         return one_tensor
+
+    @staticmethod
+    def xavier_uniform(shape: Tuple[int, ...], in_features: int, out_features: int, require_grad: bool = False) -> 'Tensor':
+        limit = np.sqrt(6 / (in_features + out_features))
+        return Tensor.init(shape, lambda s: np.random.uniform(-limit, limit, s), require_grad=require_grad)
+
+    @staticmethod
+    def he_normal(shape: Tuple[int, ...], in_features: int, require_grad: bool = False) -> 'Tensor':
+        std = np.sqrt(2 / in_features)
+        return Tensor.init(shape, lambda s: np.random.normal(0, std, s), require_grad=require_grad)
