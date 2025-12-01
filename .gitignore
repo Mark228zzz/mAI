@@ -1,5 +1,7 @@
 .venv/
-backpropagation.ipynb
 __pycache__
-TODO.txt
 .pytest_cache
+*.py[cod]
+*$py.class
+*.so
+.Python
