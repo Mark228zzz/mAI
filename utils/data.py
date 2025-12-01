@@ -125,3 +125,41 @@ class DataLoader:
             batch_tensors.append(batch_tensor)
 
         return tuple(batch_tensors)
+
+
+def split_tensors(*tensors: Tensor, test_ratio: float = 0.2) -> Tuple[Tuple[Tensor], Tuple[Tensor]]:
+    """
+    Split tensors into train and test tensors.
+
+    Args:
+        train_ratio: Ratio of training data (default: 0.8)
+
+    Returns:
+        Tuple of ([train tensors], [test tensors])
+
+    Example:
+        >>> data = Tensor.randn((100, 784))
+        >>> target = Tensor.randn((100, 10))
+        >>> data_train, target_train, data_test, target_test = split_tensors(data, target, test_ratio=0.2)
+    """
+    assert 0 < test_ratio < 1, "test_ratio must be between 0 and 1"
+
+    num_samples = tensors[0].shape[0]
+
+    split_idx = int(num_samples * test_ratio)
+
+    indices = np.arange(num_samples)
+    np.random.shuffle(indices)
+
+    train_indices = indices[split_idx:]
+    test_indices = indices[:split_idx]
+
+    # Create train tensors split
+    train = [Tensor(tensor.data[train_indices], require_grad=False) for tensor in tensors]
+
+    # Create test tensors split
+    test = [Tensor(tensor.data[test_indices], require_grad=False) for tensor in tensors]
+
+    train.extend(test)
+
+    return train
